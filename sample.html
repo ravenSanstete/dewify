@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html xmlns:xlink="http://www.w3.org/1999/xlink">
+<head>
+<meta charset="utf-8">
+<script src="d3.v2.min.js"></script>
+<script src="sample.json"></script>
+<style>
+
+.link {
+  stroke: #aaa;
+}
+
+.node text {
+stroke:#333;
+cursos:pointer;
+}
+
+.node circle{
+stroke:#fff;
+stroke-width:3px;
+fill:#555;
+}
+
+</style>
+</head>
+<body>
+</body>
+<script>
+
+
+
+function getRandomColor() {
+  var letters = '0123456789ABCDEF';
+  var color = '#';
+  for (var i = 0; i < 6; i++) {
+    color += letters[Math.floor(Math.random() * 16)];
+  }
+  return color;
+}
+
+MAX_LEN = 10;
+var colors = ['#90C3D4', '#C390D4', '#D4A190', '#A1D490' , '#D490B8'];
+
+var i = colors.length;
+while(i < MAX_LEN){
+  colors.push(getRandomColor);
+  i ++ ;
+}
+
+
+console.log(json);
+
+var width = 2000,
+    height = 1800
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width)
+    .attr("height", height);
+
+var force = d3.layout.force()
+    .gravity(.05)
+    .distance(300)
+    .charge(-100)
+    .size([width, height]);
+
+
+  force
+      .nodes(json.nodes)
+      .links(json.links)
+      .start();
+
+  var link = svg.selectAll(".link")
+      .data(json.links)
+    .enter().append("line")
+      .attr("class", "link")
+    .style("stroke-width", 1);
+
+  var node = svg.selectAll(".node")
+      .data(json.nodes)
+    .enter().append("g")
+      .attr("class", "node")
+      .call(force.drag);
+
+
+
+  node.append("circle")
+      .attr("r", function(d){ return 30 * Math.exp(-0.5*d.group)})
+      .style("fill", function(d) { return colors[d.group];});
+
+  node.append("text")
+      .attr("dx", 12)
+      .attr("dy", ".15em")
+      .style('font-size', Math.floor(function(d){ return 10 * Math.exp(-2*d.group)})+'px')
+      .text(function(d) { return d.name });
+
+
+
+
+  force.on("tick", function() {
+    link.attr("x1", function(d) { return d.source.x; })
+        .attr("y1", function(d) { return d.source.y; })
+        .attr("x2", function(d) { return d.target.x; })
+        .attr("y2", function(d) { return d.target.y; });
+
+    node.attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
+  });
+
+</script>
+</html>
