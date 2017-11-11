@@ -14,7 +14,7 @@
     renderer.setSize(1000, 1000);
     document.getElementById('container').appendChild(renderer.domElement);
 
-
+    // morino saikko
     // set the light
     var ambientLight = new THREE.AmbientLight(0xffffff, 1);
     var pointLight = new THREE.PointLight(0xffffff, 1, 10, 2);
