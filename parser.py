@@ -311,5 +311,5 @@ if __name__ == '__main__':
     for j in range(10, 15):
         for i in range(1, count[j-10]+1):
             print('parsing {}:{}'.format(j, i));
-            bvh_convert(test_path.format(j,j,str(i).rjust(2, '0')));
+            bvh_convert(test_path.format(j,j,str(i).rjust(2, '0')), "motions/{}_{}.json".format(j, str(i).rjust(2, '0')));
     bvh_convert('data/Example1.bvh', 'Example1.json');
