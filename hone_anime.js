@@ -10,19 +10,21 @@
       // alpha: true
       antialias: true
     });
-    renderer.setClearColor(0x691919, 1);
+    renderer.setClearColor(0x0, 1);
     renderer.setSize(1000, 1000);
     document.getElementById('container').appendChild(renderer.domElement);
 
     // morino saikko
     // set the light
     var ambientLight = new THREE.AmbientLight(0xffffff, 1);
-    var pointLight = new THREE.PointLight(0xffffff, 1, 10, 2);
-    pointLight.position.set(0, 1.4, 3.4);
-    scene.add(pointLight, ambientLight);
+    var dirLight = new THREE.DirectionalLight(0xffffff, 1);
+    dirLight.position.set(100, 100, 50);
+
+    scene.add(dirLight, ambientLight);
 
     // set the camera
-    camera.position.set(0, 0, 2);
+    camera.position.set(0, 10, 30);
+
 
     var JNT_COLOR = '#476490';
     var JNT_SCALE = 0.5;
@@ -67,7 +69,7 @@
         this.len = chn_num;
         this.ds = ds;
         this.pid = pid;
-        this.mesh = new THREE.Mesh(new THREE.SphereGeometry(JNT_SCALE, JNT_SCALE, JNT_SCALE), new THREE.MeshLambertMaterial({color: '#476490'}));
+        this.mesh = new THREE.Mesh(new THREE.SphereGeometry(JNT_SCALE, JNT_SCALE, JNT_SCALE), new THREE.MeshPhongMaterial( { color: JNT_COLOR, specular: 0x555555, shininess: 30 } ));
     }
 
 
@@ -108,8 +110,6 @@
       }
 
       //sorting the tree into a list of topo-order
-      console.log(bones);
-      console.log(trav_order);
 
       // calculate the inverse bind matrix with the first frame information
       var delay = mocap['motion']['frame_time'] * 1000; //let it to be of milli-sec dim
@@ -117,6 +117,8 @@
       var local_mat;
       for(var i = 0; i < trav_order.length; i++){
         var cur = trav_order[i];
+        var position = vec4.fromValues(0.0, 0.0, 0.0, 1.0);
+
         if(cur == ROOT_ID)
           local_mat = calculate_local_mat(origin_frame.slice(bones[cur].ost, bones[cur].ost + bones[cur].len));
         else
@@ -126,12 +128,20 @@
           bones[cur].world_matrix = local_mat;
         else
           mat4.multiply(bones[cur].world_matrix, bones[bones[cur].pid].world_matrix, local_mat);
-        
+
 
         mat4.invert(bones[cur].inverse_bind_pos, bones[cur].world_matrix);
+
+
+        vec4.transformMat4(position, position, bones[cur].world_matrix);
+
+        bones[cur].mesh.position.set(position[0], position[1], position[2]);
+        console.log(position);
+        scene.add(bones[cur].mesh);
       }
 
-      console.log(bones);
+
+
 
 
 
@@ -194,6 +204,153 @@
     }
 
 
+    /*
+    BEGIN OF CODES FOR CAMERA CONTROL
+
+    REVISED FROM https://github.com/godbasin/godbasin.github.io/blob/blog-codes/three-notes/5-add-mouse-move/js/test.js
+    どうもです！・　
+    */
+
+
+    // 定义角度
+    var theta = 0;
+    // 初始化鼠标X方向移动值
+    var mouseX = 0;
+    var r = 1000 / (0.2* Math.PI); // 用于角度计算： 鼠标移动1000px时，角度改变2PI
+    var far = 20000; // 用于照相机焦点设置（焦点距离，越大越精确）
+    var move = 1; // 用于步长（照相机移动距离）
+
+
+    // 添加按键时走动
+    document.addEventListener('keydown', handleKeydown, false);
+
+
+
+    // 处理按键
+    function handleKeydown(e) {
+        var e = e || window.event;
+        var keyCode = event.keyCode ? event.keyCode : event.which ? event.which : event.charCode;
+
+        if ('37, 38, 39, 40, 65, 87, 68, 83'.indexOf(keyCode) === -1) {
+            return;
+        } else {
+            switch (e.keyCode) {
+                case 37:
+                case 65:
+                    CameraMove('left');
+                    break;
+                case 38:
+                case 87:
+                    CameraMove('forward');
+                    break;
+                case 39:
+                case 68:
+                    CameraMove('right');
+                    break;
+                case 83:
+                case 40:
+                    CameraMove('backward');
+                    break;
+            }
+        }
+    }
+
+    // 照相机移动计算
+    function CameraMove(direction) {
+
+        var oX = camera.position.x, oY = camera.position.y, oZ = camera.position.z;
+        var x = oX, y = oY, z = oZ;
+        switch (direction) {
+            case 'left':
+                x = oX - move * Math.cos(theta);
+                y = oY + move * Math.sin(theta);
+                break;
+            case 'forward':
+                z = oZ - move;
+                break;
+            case 'right':
+                x = oX + move * Math.cos(theta);
+                y = oY - move * Math.sin(theta);
+                break;
+            case 'backward':
+                z = oZ + move;
+                break;
+        }
+        camera.position.x = x;
+        camera.position.y = y;
+        camera.position.z = z;
+
+
+    }
+
+    // 初始化鼠标移动值
+    function initMousePosition(e) {
+        mouseX = getMousePos(e || window.event);
+    }
+
+    // 获取鼠标坐标
+    function getMousePos(event) {
+        var e = event || window.event;
+        var scrollX = document.documentElement.scrollLeft || document.body.scrollLeft;
+        var scrollY = document.documentElement.scrollTop || document.body.scrollTop;
+        var x = e.pageX || e.clientX + scrollX;
+        var y = e.pageY || e.clientY + scrollY;
+        return { 'x': x, 'y': y };
+    }
+
+    // 更新照相机焦点
+    function renderCameraLookat() {
+        camera.lookAt(new THREE.Vector3(camera.position.x + far * Math.sin(theta), camera.position.y + far * Math.cos(theta), 1));
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+    /*
+    END OF CODES FOR CAMERA CONTROL
+    */
+
+
+
+
+
+
+
+
+
+
+
+
     render();
     startAnimation();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   })();
