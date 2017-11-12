@@ -1,5 +1,5 @@
 (function (){
-    var PATH = 'motions/10_01.json';
+    var PATH = 'motions/13_25.json';
     var scene = new THREE.Scene();
     var camera = new THREE.PerspectiveCamera(
       75, 2, 0.1, 1000
@@ -42,7 +42,6 @@
 
     // the parsing order for transf is [X, Y, Z, Z_ROT, Y_ROT, X_ROT]
     function calculate_local_mat(transf){
-        console.log(transf);
         //fill the array
         while(DOF > transf.length)
             transf.push(0.0);
@@ -55,21 +54,26 @@
     }
 
 
+        var ANIME = null;
+        var BONES = null;
+        var ORDER = null;
+        var DELAY = 0;
+
+
     /**
     NOTE : IMPORTANT FUNC.
       one of the most important function in this script, for generating the skeletal animation from the json log file,
       which should start an animation function, after adding each node with links into the scene
     **/
     function Bone(ost, chn_num, ds, pid){
-        this.inverse_bind_pos = mat4.create();
         this.world_matrix = mat4.create(); //store this because the children needs the parent's world matrix for transformation
-        this.offset_matrix = mat4.create();
         // the following two entries for a faster addressing of the frame data
         this.ost = ost;
         this.len = chn_num;
         this.ds = ds;
         this.pid = pid;
         this.mesh = new THREE.Mesh(new THREE.SphereGeometry(JNT_SCALE, JNT_SCALE, JNT_SCALE), new THREE.MeshPhongMaterial( { color: JNT_COLOR, specular: 0x555555, shininess: 30 } ));
+
     }
 
 
@@ -115,42 +119,83 @@
       var delay = mocap['motion']['frame_time'] * 1000; //let it to be of milli-sec dim
       var origin_frame = mocap['motion']['frames'][0];
       var local_mat;
-      for(var i = 0; i < trav_order.length; i++){
-        var cur = trav_order[i];
-        var position = vec4.fromValues(0.0, 0.0, 0.0, 1.0);
+      var anime = [new Array()];
 
-        if(cur == ROOT_ID)
-          local_mat = calculate_local_mat(origin_frame.slice(bones[cur].ost, bones[cur].ost + bones[cur].len));
-        else
-          local_mat = calculate_local_mat(bones[cur].ds.concat(origin_frame.slice(bones[cur].ost, bones[cur].ost + bones[cur].len)));
+      // for(var i = 0; i < trav_order.length; i++){
+      //   var cur = trav_order[i];
+      //   var position = vec4.fromValues(0.0, 0.0, 0.0, 1.0);
+      //
+      //   if(cur == ROOT_ID)
+      //     local_mat = calculate_local_mat(origin_frame.slice(bones[cur].ost, bones[cur].ost + bones[cur].len));
+      //   else
+      //     local_mat = calculate_local_mat(bones[cur].ds.concat(origin_frame.slice(bones[cur].ost, bones[cur].ost + bones[cur].len)));
+      //
+      //   if(cur == ROOT_ID)
+      //     bones[cur].world_matrix = local_mat;
+      //   else
+      //     mat4.multiply(bones[cur].world_matrix, bones[bones[cur].pid].world_matrix, local_mat);
+      //
+      //
+      //   mat4.invert(bones[cur].inverse_bind_pos, bones[cur].world_matrix);
+      //
+      //
+      //   vec4.transformMat4(position, position, bones[cur].world_matrix);
+      //
+      //   bones[cur].mesh.position.set(position[0], position[1], position[2]);
+      //
+      //   anime[0].push(position[0]);
+      //   anime[0].push(position[1]);
+      //   anime[0].push(position[2]);
+      //
+      //
+      //
+      // }
 
-        if(cur == ROOT_ID)
-          bones[cur].world_matrix = local_mat;
-        else
-          mat4.multiply(bones[cur].world_matrix, bones[bones[cur].pid].world_matrix, local_mat);
 
 
-        mat4.invert(bones[cur].inverse_bind_pos, bones[cur].world_matrix);
+      // begin to play
+      for(var i = 0; i < mocap['motion']['frames'].length; i++){
+        var timer_delay = delay * i;
+        var current_frame = mocap['motion']['frames'][i];
+        anime.push(new Array());
+        for(var j = 0; j < trav_order.length; j++){
+          var cur = trav_order[j];
+          var position = vec4.fromValues(0.0, 0.0, 0.0, 1.0);
 
 
-        vec4.transformMat4(position, position, bones[cur].world_matrix);
+          if(cur == ROOT_ID)
+            local_mat = calculate_local_mat(current_frame.slice(bones[cur].ost, bones[cur].ost + bones[cur].len));
+          else
+            local_mat = calculate_local_mat(bones[cur].ds.concat(current_frame.slice(bones[cur].ost, bones[cur].ost + bones[cur].len)));
 
-        bones[cur].mesh.position.set(position[0], position[1], position[2]);
-        console.log(position);
-        scene.add(bones[cur].mesh);
+          if(cur == ROOT_ID)
+            bones[cur].world_matrix = local_mat;
+          else
+            mat4.multiply(bones[cur].world_matrix, bones[bones[cur].pid].world_matrix, local_mat);
+
+          // mat4.multiply(local_mat, bones[cur].world_matrix, bones[cur].inverse_bind_pos);
+
+          vec4.transformMat4(position, position, bones[cur].world_matrix);
+
+          anime[i].push(position[0]);
+          anime[i].push(position[1]);
+          anime[i].push(position[2]);
+
+          if (i == 0){
+            bones[cur].mesh.position.set(position[0], position[1], position[2]);
+            scene.add(bones[cur].mesh);
+          }
+
+
+        }
       }
 
 
+      BONES = bones;
+      DELAY = delay;
+      ORDER = trav_order;
 
-
-
-
-
-
-
-
-
-      return;
+      return anime;
     }
 
 
@@ -170,6 +215,8 @@
     scene.add(group2);
     */
 
+
+
     (function() {
         var xhr = new XMLHttpRequest();
         xhr.open('GET', PATH, false);
@@ -180,27 +227,53 @@
 
         // it is easy to see the hierarchy is of the form of a tree.
         // we first construct a dictionary for each internal node mapping their id to their children for later usage
-        play_hone_anime(mocap, scene);
+        ANIME = play_hone_anime(mocap, scene);
 
 
-        //console.log(mocap);
+
 
     }());
 
-
-    function startAnimation() {
-      /*
-      new TWEEN.Tween(mesh1.position).to({x: [-0.5, -2]}, 1000).easing(TWEEN.Easing.Quadratic.InOut).delay(3000).start();
-      new TWEEN.Tween(mesh2.position).to({x: [1.5, 0]}, 1000).easing(TWEEN.Easing.Quadratic.InOut).delay(3500).start();
-      */
-    }
+    var unset = true;
 
 
-    function render() {
+    function render(time) {
       requestAnimationFrame(render);
+      // set the new position here
+      if(ANIME != null){
+        if(unset){
+          render.genesis = time;
+          unset = false;
+        }
+
+        ANIME.push(ANIME[ANIME.length - 1].slice(0));
+
+        var delta = (time - render.genesis)/ DELAY;
+        var ind = Math.floor(delta);
+        var w_1 = delta - ind;
+
+        ind %= (ANIME.length - 1);
+
+
+        for(var j = 0; j < ORDER.length; j++){
+              var cur = ORDER[j];
+              var w_2 = 1 - w_1;
+
+              BONES[cur].mesh.position.set(w_1 * ANIME[ind][3*j] + w_2 * ANIME[ind+1][3*j],
+                                          w_1 * ANIME[ind][3*j+1] + w_2 * ANIME[ind+1][3*j+1],
+                                        w_1 * ANIME[ind][3*j+2] + w_2 * ANIME[ind+1][3*j+2]);
+       }
+
+
+
+
+        // UPDATE THE LINES HERE
+      }
+
+
+
       renderer.render(scene, camera);
 
-      TWEEN.update();
     }
 
 
@@ -218,7 +291,7 @@
     var mouseX = 0;
     var r = 1000 / (0.2* Math.PI); // 用于角度计算： 鼠标移动1000px时，角度改变2PI
     var far = 20000; // 用于照相机焦点设置（焦点距离，越大越精确）
-    var move = 1; // 用于步长（照相机移动距离）
+    var move = 10; // 用于步长（照相机移动距离）
 
 
     // 添加按键时走动
@@ -330,8 +403,8 @@
 
 
 
-    render();
-    startAnimation();
+    render(0);
+
 
 
 
