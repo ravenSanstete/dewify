@@ -58,7 +58,7 @@
       one of the most important function in this script, for generating the skeletal animation from the json log file,
       which should start an animation function, after adding each node with links into the scene
     **/
-    function Bone(ost, chn_num, ds){
+    function Bone(ost, chn_num, ds, pid){
         this.inverse_bind_pos = mat4.create();
         this.world_matrix = mat4.create(); //store this because the children needs the parent's world matrix for transformation
         this.offset_matrix = mat4.create();
@@ -66,6 +66,7 @@
         this.ost = ost;
         this.len = chn_num;
         this.ds = ds;
+        this.pid = pid;
         this.mesh = new THREE.Mesh(new THREE.SphereGeometry(JNT_SCALE, JNT_SCALE, JNT_SCALE), new THREE.MeshLambertMaterial({color: '#476490'}));
     }
 
@@ -84,7 +85,7 @@
         var id = mocap['hierarchy'][i]['id'];
         var chn_num = mocap['hierarchy'][i]['chn_num'];
         // create my own structure wrapping the THREE.js's mesh type
-        bones[id] = new Bone(ost, chn_num, mocap['hierarchy'][i]['offsets']); //chn_num always greater than zero
+        bones[id] = new Bone(ost, chn_num, mocap['hierarchy'][i]['offsets'], pid); //chn_num always greater than zero
         ost += chn_num;
 
         if(pid < 0) continue;
@@ -121,8 +122,16 @@
         else
           local_mat = calculate_local_mat(bones[cur].ds.concat(origin_frame.slice(bones[cur].ost, bones[cur].ost + bones[cur].len)));
 
-        // console.log(local_mat);
+        if(cur == ROOT_ID)
+          bones[cur].world_matrix = local_mat;
+        else
+          mat4.multiply(bones[cur].world_matrix, bones[bones[cur].pid].world_matrix, local_mat);
+        
+
+        mat4.invert(bones[cur].inverse_bind_pos, bones[cur].world_matrix);
       }
+
+      console.log(bones);
 
 
 
